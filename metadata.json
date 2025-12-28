@@ -1,0 +1,7 @@
+{
+  "name": "Fengdu Ming Shan Digital Twin",
+  "description": "An interactive 3D visualization of Fengdu Ghost City (Ming Shan) featuring a mathematically generated digital terrain with data-flow aesthetics.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
