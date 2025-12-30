@@ -4,6 +4,10 @@ import { OrbitControls, Stars } from '@react-three/drei';
 import DigitalMountain from './DigitalMountain';
 import { SectionId } from '../types';
 
+// Fix for missing R3F types
+const Color = 'color' as any;
+const Fog = 'fog' as any;
+
 interface SceneProps {
   activeSection: SectionId;
   isDispersed: boolean;
@@ -14,14 +18,12 @@ interface SceneProps {
 const Scene: React.FC<SceneProps> = ({ activeSection, isDispersed, rotationTarget, onSpotClick }) => {
   return (
     <Canvas
-      camera={{ position: [20, 10, 40], fov: 30 }} // Adjusted for a slightly more direct, cinematic view
-      gl={{ antialias: true, alpha: true }}
-      dpr={[1, 2]}
+      camera={{ position: [20, 10, 40], fov: 30 }}
+      dpr={[1, 2]} // Restore higher DPR for sharper look
     >
-      <color attach="background" args={['#020408']} />
+      <Color attach="background" args={['#020408']} />
       
-      {/* Fog matched to background - Deep Dark Blue/Black */}
-      <fog attach="fog" args={['#020408', 20, 90]} />
+      <Fog attach="fog" args={['#020408', 20, 100]} />
 
       <Suspense fallback={null}>
         <DigitalMountain 
@@ -31,7 +33,6 @@ const Scene: React.FC<SceneProps> = ({ activeSection, isDispersed, rotationTarge
             onSpotClick={onSpotClick}
         />
         
-        {/* Layer 1: Distant background stars */}
         <Stars 
           radius={150} 
           depth={80} 
@@ -40,17 +41,6 @@ const Scene: React.FC<SceneProps> = ({ activeSection, isDispersed, rotationTarge
           saturation={0} 
           fade 
           speed={0.1} 
-        />
-        
-        {/* Layer 2: Closer, brighter stars for depth */}
-        <Stars 
-          radius={80} 
-          depth={20} 
-          count={1000} 
-          factor={2} 
-          saturation={0.5} 
-          fade 
-          speed={0.2} 
         />
       </Suspense>
 

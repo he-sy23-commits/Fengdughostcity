@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FilesetResolver, HandLandmarker, DrawingUtils } from '@mediapipe/tasks-vision';
-import { Camera, Hand, Loader2, MousePointer2, Expand, RefreshCw } from 'lucide-react';
+import { Camera, Hand, Loader2, MousePointer2, Expand, RefreshCw, MoveHorizontal } from 'lucide-react';
 
 interface HandControllerProps {
   onDisperse: (isDispersed: boolean) => void;
@@ -38,7 +38,6 @@ const HandController: React.FC<HandControllerProps> = ({ onDisperse, onRotate })
         });
 
         setStatus('Accessing Camera...');
-        // Start Webcam
         stream = await navigator.mediaDevices.getUserMedia({ 
           video: { 
             width: { ideal: 640 },
@@ -49,7 +48,6 @@ const HandController: React.FC<HandControllerProps> = ({ onDisperse, onRotate })
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          // Explicitly play (needed for some browsers)
           await videoRef.current.play();
           
           setIsLoaded(true);
@@ -83,7 +81,6 @@ const HandController: React.FC<HandControllerProps> = ({ onDisperse, onRotate })
         const wrist = landmarks[0];
         
         // Helper to check if finger is extended
-        // Calculates ratio of distance: Wrist->Tip vs Wrist->PIP
         const isExtended = (tipIdx: number, pipIdx: number) => {
            const dTip = Math.hypot(landmarks[tipIdx].x - wrist.x, landmarks[tipIdx].y - wrist.y);
            const dPip = Math.hypot(landmarks[pipIdx].x - wrist.x, landmarks[pipIdx].y - wrist.y);
@@ -100,21 +97,27 @@ const HandController: React.FC<HandControllerProps> = ({ onDisperse, onRotate })
 
         // Gesture Logic
         if (extendedCount >= 4) {
+          // OPEN PALM: Disperse + Control Rotation (Swirling effect)
           setGesture('OPEN');
           onDisperse(true);
-          onRotate(null);
+          
+          // Use the hand's X center (approx via middle finger knuckle) to control rotation
+          // 0 is right, 1 is left (mirror effect).
+          // Map 0..1 to approx -3..3 radians
+          const x = 1.0 - landmarks[9].x; 
+          onRotate((x - 0.5) * 6); 
+
         } else if (extendedCount === 0 || (extendedCount === 1 && thumbOpen)) {
-          // Fist
+          // FIST: Gather, auto-rotate (reset)
           setGesture('FIST');
           onDisperse(false);
-          onRotate(null);
+          onRotate(null); // Release manual control
         } else if (indexOpen && !middleOpen && !ringOpen && !pinkyOpen) {
+          // POINTING: Just Rotate
           setGesture('POINTING');
           onDisperse(false);
-          // Map X coordinate (0 to 1) to Rotation (-PI to PI range approx)
-          // Increased sensitivity factor to 8 for fuller rotation
           const x = 1.0 - landmarks[8].x; 
-          onRotate((x - 0.5) * 8); 
+          onRotate((x - 0.5) * 4); 
         } else {
           setGesture('NONE');
         }
@@ -142,13 +145,13 @@ const HandController: React.FC<HandControllerProps> = ({ onDisperse, onRotate })
         for (const landmarks of result.landmarks) {
           const drawingUtils = new DrawingUtils(ctx);
           drawingUtils.drawConnectors(landmarks, HandLandmarker.HAND_CONNECTIONS, {
-            color: "rgba(255, 255, 255, 0.5)",
-            lineWidth: 2
+            color: "rgba(255, 255, 255, 0.3)",
+            lineWidth: 1
           });
           drawingUtils.drawLandmarks(landmarks, {
             color: "#A8A29E", 
             lineWidth: 1,
-            radius: 3
+            radius: 2
           });
         }
       }
@@ -167,17 +170,13 @@ const HandController: React.FC<HandControllerProps> = ({ onDisperse, onRotate })
   }, []);
 
   if (hasError) {
-    return (
-        <div className="fixed bottom-4 right-4 z-50 px-4 py-2 bg-red-900/50 backdrop-blur-md rounded-lg border border-red-500/30 text-red-200 text-xs font-serif-en">
-            Camera Error. Check Permissions.
-        </div>
-    );
+    return null;
   }
 
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col-reverse items-end gap-2 group">
       {/* Camera Preview */}
-      <div className={`relative w-32 h-24 bg-black/40 backdrop-blur-md rounded-lg overflow-hidden border border-white/10 shadow-lg transition-opacity duration-500 ${isLoaded ? 'opacity-40 group-hover:opacity-100' : 'opacity-100'}`}>
+      <div className={`relative w-32 h-24 bg-black/40 backdrop-blur-md rounded-lg overflow-hidden border border-white/10 shadow-lg transition-opacity duration-500 ${isLoaded ? 'opacity-30 group-hover:opacity-100' : 'opacity-100'}`}>
         {!isLoaded && (
           <div className="absolute inset-0 flex flex-col gap-2 items-center justify-center text-white/50">
             <Loader2 className="w-5 h-5 animate-spin" />
@@ -198,13 +197,13 @@ const HandController: React.FC<HandControllerProps> = ({ onDisperse, onRotate })
       
       {/* Status Badge */}
       <div className="flex items-center gap-2 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-full border border-white/10 transition-all duration-300">
-         {gesture === 'OPEN' && <Expand className="w-3 h-3 text-cyan-400" />}
+         {gesture === 'OPEN' && <MoveHorizontal className="w-3 h-3 text-cyan-400" />}
          {gesture === 'FIST' && <Hand className="w-3 h-3 text-emerald-400" />}
          {gesture === 'POINTING' && <MousePointer2 className="w-3 h-3 text-amber-400" />}
          {gesture === 'NONE' && <RefreshCw className="w-3 h-3 text-stone-500" />}
          
          <span className="text-xs font-serif-en tracking-wider text-stone-200 uppercase">
-            {gesture === 'OPEN' && "DISPERSE"}
+            {gesture === 'OPEN' && "SWIRL & DISPERSE"}
             {gesture === 'FIST' && "GATHER"}
             {gesture === 'POINTING' && "ROTATE"}
             {gesture === 'NONE' && (isLoaded ? "Scanning..." : "Init...")}
